@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>My Data Server</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+  :root{
+    color-scheme:light dark;
+    --bg:#ffffff; --subtle:#f6f8fa; --border:#d0d7de; --fg:#1f2328; --muted:#656d76;
+    --accent:#0969da; --green:#1f883d; --green-h:#1a7f37; --danger:#cf222e; --ok:#1a7f37;
+    --warn-bg:#fff8c5; --warn-b:#d4a72c; --warn-fg:#633c01; --focus:rgba(9,105,218,.3);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0d1117; --subtle:#161b22; --border:#30363d; --fg:#e6edf3; --muted:#7d8590;
+      --accent:#2f81f7; --green:#238636; --green-h:#2ea043; --danger:#f85149; --ok:#3fb950;
+      --warn-bg:rgba(187,128,9,.15); --warn-b:rgba(187,128,9,.4); --warn-fg:#d29922; --focus:rgba(47,129,247,.4);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+    font-size:14px;line-height:1.5;color:var(--fg);background:var(--subtle);min-height:100vh;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+  .wrap{max-width:600px;margin:0 auto;padding:24px 16px 60px}
+  header.brand{display:flex;align-items:center;gap:12px;margin:8px 0 20px}
+  .logo{color:var(--fg);display:flex}
+  .brand h1{font-size:20px;font-weight:600;margin:0}
+  .brand p{margin:0;font-size:12px;color:var(--muted)}
+  .card{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:16px}
+  .card h2{font-size:16px;font-weight:600;margin:0 0 4px}
+  .sub{font-size:12px;color:var(--muted);margin:0 0 12px}
+  label{display:block;font-size:14px;font-weight:600;margin:12px 0 6px}
+  .field{position:relative}
+  input,textarea{width:100%;padding:7px 12px;font-size:16px;color:var(--fg);background:var(--bg);border:1px solid var(--border);
+    border-radius:6px;outline:none;font-family:inherit;box-shadow:inset 0 1px 0 rgba(208,215,222,.2)}
+  input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--focus)}
+  textarea{min-height:110px;resize:vertical}
+  .eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--muted);
+    font-size:12px;padding:6px 8px;cursor:pointer;width:auto;margin:0;font-weight:400}
+  .eye:hover{color:var(--accent);background:none}
+  .field input.has-eye{padding-right:52px}
+  button{font-family:inherit;cursor:pointer;font-size:14px;font-weight:500;padding:5px 16px;border-radius:6px;
+    color:#fff;background:var(--green);border:1px solid rgba(31,35,40,.15);line-height:20px}
+  button:hover{background:var(--green-h)}
+  button:disabled{opacity:.6;cursor:not-allowed}
+  button.block{width:100%;margin-top:16px;padding:7px 16px}
+  button.ghost{background:var(--subtle);color:var(--fg);border:1px solid var(--border)}
+  button.ghost:hover{background:var(--border)}
+  button.danger{background:var(--subtle);color:var(--danger);border:1px solid var(--border)}
+  button.danger:hover{background:var(--danger);color:#fff;border-color:var(--danger)}
+  button.sm{padding:3px 12px;font-size:12px}
+  .tabs{display:flex;border-bottom:1px solid var(--border);margin:-4px 0 4px}
+  .tabs button{background:transparent;color:var(--muted);border:0;border-bottom:2px solid transparent;border-radius:0;
+    padding:8px 16px;font-weight:400;margin-bottom:-1px}
+  .tabs button:hover{background:transparent;color:var(--fg)}
+  .tabs button.on{color:var(--fg);font-weight:600;border-bottom-color:#fd8c73}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:0 10px;line-height:22px;border-radius:2em;
+    border:1px solid var(--border);color:var(--fg);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .toolbar{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+  .toolbar input{flex:1}
+  .count{font-size:12px;color:var(--muted);white-space:nowrap}
+  #list{border:1px solid var(--border);border-radius:6px;overflow:hidden}
+  .item{padding:12px 16px;border-bottom:1px solid var(--border)}
+  .item:last-child{border-bottom:0}
+  .item .head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .item .t{font-weight:600;color:var(--accent);word-break:break-word}
+  .item .d{font-size:12px;color:var(--muted)}
+  .item .body{white-space:pre-wrap;word-break:break-all;background:var(--subtle);border:1px solid var(--border);border-radius:6px;
+    padding:12px;margin:10px 0 0;font-size:12px;line-height:1.6;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .item .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .empty{text-align:center;color:var(--muted);padding:32px 10px}
+  .empty .big{display:none}
+  .warn{font-size:12px;color:var(--warn-fg);background:var(--warn-bg);border:1px solid var(--warn-b);padding:8px 12px;border-radius:6px;margin-top:12px}
+  .hidden{display:none !important}
+  #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translate(-50%,10px);opacity:0;pointer-events:none;
+    background:var(--bg);border:1px solid var(--border);border-left:4px solid var(--accent);color:var(--fg);padding:10px 14px;border-radius:6px;
+    font-size:14px;max-width:90%;box-shadow:0 8px 24px rgba(140,149,159,.3);transition:opacity .2s, transform .2s;z-index:50}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+  #toast.err{border-left-color:var(--danger)}
+  #toast.ok{border-left-color:var(--ok)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brand">
+    <div class="logo"><svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2 3.5C2 2.12 4.69 1 8 1s6 1.12 6 2.5v9c0 1.38-2.69 2.5-6 2.5s-6-1.12-6-2.5v-9Zm1.5 0c0 .35 1.5 1 4.5 1s4.5-.65 4.5-1S11 2.5 8 2.5 3.5 3.15 3.5 3.5Zm9 2.3C11.4 6.5 9.8 6.5 8 6.5S4.6 6.5 3.5 5.8v2.2c0 .35 1.5 1 4.5 1s4.5-.65 4.5-1V5.8Zm0 4C11.4 10.5 9.8 10.5 8 10.5s-3.4 0-4.5-.7v2.7c0 .35 1.5 1 4.5 1s4.5-.65 4.5-1V9.8Z"/></svg></div>
+    <div>
+      <h1>My Data Server</h1>
+      <p>あなただけが読める、暗号化データ保管庫</p>
+    </div>
+  </header>
+
+  <!-- ログイン -->
+  <section class="card" id="authBox">
+    <div class="tabs">
+      <button id="tabLogin" class="on" type="button">ログイン</button>
+      <button id="tabSignup" type="button">新規登録</button>
+    </div>
+    <label for="email">ユーザー名 または メールアドレス</label>
+    <div class="field"><input id="email" type="text" autocapitalize="none" autocomplete="username" placeholder="例: taro_01"></div>
+    <label for="password">パスワード(8文字以上)</label>
+    <div class="field">
+      <input id="password" class="has-eye" type="password" autocomplete="current-password" placeholder="パスワード">
+      <button class="eye" type="button" data-eye="password" aria-label="表示切替">表示</button>
+    </div>
+    <div id="pw2Wrap" class="hidden">
+      <label for="password2">パスワード(確認)</label>
+      <div class="field"><input id="password2" type="password" autocomplete="new-password" placeholder="もう一度入力"></div>
+      <div class="warn">ユーザー名で登録した場合、パスワードを忘れると復旧できません。必ず控えてください。</div>
+    </div>
+    <button class="block" id="authSubmit" type="button">ログイン</button>
+  </section>
+
+  <!-- ロック解除 -->
+  <section class="card hidden" id="lockBox">
+    <h2 id="lockTitle">データを開く</h2>
+    <p class="sub" id="lockNote"></p>
+    <label for="vpass">あいことば</label>
+    <div class="field">
+      <input id="vpass" class="has-eye" type="password" autocomplete="off" placeholder="あいことば(8文字以上)">
+      <button class="eye" type="button" data-eye="vpass" aria-label="表示切替">表示</button>
+    </div>
+    <div id="vpass2Wrap" class="hidden">
+      <label for="vpass2">あいことば(確認)</label>
+      <div class="field"><input id="vpass2" type="password" autocomplete="off" placeholder="もう一度入力"></div>
+      <div class="warn">あいことばを忘れると、保存したデータは誰にも復元できません。ログイン用パスワードとは別のものを決めて、控えておいてください。</div>
+    </div>
+    <button class="block" id="unlock" type="button">開く</button>
+    <button class="block ghost" id="logout1" type="button">ログアウト</button>
+  </section>
+
+  <!-- メイン -->
+  <div id="appBox" class="hidden">
+    <section class="card">
+      <div class="topbar">
+        <span class="chip"><span class="dot"></span><span id="who"></span></span>
+        <div class="row">
+          <button class="ghost sm" id="lock" type="button">ロック</button>
+          <button class="ghost sm" id="logout2" type="button">ログアウト</button>
+        </div>
+      </div>
+      <p class="sub" style="margin:10px 0 0">5分操作しないと自動でロックされます。</p>
+    </section>
+
+    <section class="card">
+      <h2>新しく保存</h2>
+      <p class="sub">タイトルも内容も、ブラウザ内で暗号化されてから送信されます。</p>
+      <label for="title">タイトル</label>
+      <input id="title" maxlength="100" placeholder="例: ○○サービスの情報">
+      <label for="body">内容</label>
+      <textarea id="body" placeholder="ここに保存したい内容を入力"></textarea>
+      <button class="block" id="add" type="button">暗号化して保存</button>
+    </section>
+
+    <section class="card">
+      <h2>保存したデータ</h2>
+      <div class="toolbar" style="margin-top:10px">
+        <input id="search" placeholder="タイトルで検索">
+        <span class="count" id="count"></span>
+      </div>
+      <div id="list"></div>
+    </section>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+const supabase = window.supabase.createClient(
+  'https://oqawhqogeikktxpbilbd.supabase.co',
+  'sb_publishable_ojQOZBJW_-mIv2opUbzU2g_3J1FimWn'
+);
+const $ = id => document.getElementById(id);
+const enc = new TextEncoder(), dec = new TextDecoder();
+const FAKE_DOMAIN = 'example.com';
+
+let cryptoKey = null;      // メモリ上のみ。ページを閉じると消える
+let hasSetup = false;
+let items = [];            // 復号済み(メモリ上のみ)
+let idleTimer = null;
+let mode = 'login';
+let toastTimer = null;
+
+/* ---------- 通知 ---------- */
+function toast(msg, type){
+  const t = $('toast');
+  t.textContent = msg; t.className = 'show ' + (type || '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ t.className = ''; }, type==='err' ? 6000 : 3000);
+}
+async function busy(btn, fn){
+  const label = btn.textContent; btn.disabled = true;
+  try{ return await fn(); } finally { btn.disabled = false; btn.textContent = label; }
+}
+
+/* ---------- 暗号化(ブラウザ内で完結) ---------- */
+function b64(buf){
+  const bytes = new Uint8Array(buf); let s = '';
+  for(let i=0;i<bytes.length;i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+function unb64(s){ return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+async function deriveKey(pass, salt){
+  const base = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt, iterations:310000, hash:'SHA-256' },
+    base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']
+  );
+}
+async function encryptObj(key, obj){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, enc.encode(JSON.stringify(obj)));
+  return { iv: b64(iv), ct: b64(ct) };
+}
+async function decryptObj(key, iv, ct){
+  const pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv: unb64(iv) }, key, unb64(ct));
+  return JSON.parse(dec.decode(pt));
+}
+
+/* ---------- 画面切り替え ---------- */
+function show(state){
+  $('authBox').classList.toggle('hidden', state!=='auth');
+  $('lockBox').classList.toggle('hidden', state!=='lock');
+  $('appBox').classList.toggle('hidden', state!=='app');
+}
+function resetIdle(){
+  clearTimeout(idleTimer);
+  if(cryptoKey) idleTimer = setTimeout(()=>{ lockVault(); toast('自動でロックしました'); }, 5*60*1000);
+}
+['click','keydown','touchstart'].forEach(e => document.addEventListener(e, resetIdle));
+
+function lockVault(){
+  cryptoKey = null; items = []; clearTimeout(idleTimer);
+  $('list').innerHTML = ''; $('search').value = '';
+  $('vpass').value = ''; $('vpass2').value = '';
+  refresh();
+}
+function displayName(user){
+  const m = (user.email||'').match(/^vault\.(.+)@example\.com$/);
+  return m ? m[1] : (user.email || 'ユーザー');
+}
+
+async function refresh(){
+  const { data:{ session } } = await supabase.auth.getSession();
+  if(!session){ cryptoKey = null; items = []; show('auth'); return; }
+  $('who').textContent = displayName(session.user);
+  if(cryptoKey){ show('app'); loadItems(); return; }
+
+  const { data, error } = await supabase.from('user_settings')
+    .select('key').eq('app','vault').in('key',['salt','check']);
+  if(error){ toast('読み込みエラー: '+error.message, 'err'); return; }
+  hasSetup = !!(data && data.length === 2);
+  $('vpass2Wrap').classList.toggle('hidden', hasSetup);
+  $('lockTitle').textContent = hasSetup ? 'データを開く' : 'あいことばを決める(初回のみ)';
+  $('lockNote').textContent = hasSetup
+    ? '決めたあいことばを入力してください。'
+    : 'このあいことばでデータを暗号化します。サーバー側には、あいことばも中身も保存されません。';
+  $('unlock').textContent = hasSetup ? '開く' : '設定して開く';
+  show('lock');
+}
+
+/* ---------- 認証 ---------- */
+function setMode(m){
+  mode = m;
+  $('tabLogin').classList.toggle('on', m==='login');
+  $('tabSignup').classList.toggle('on', m==='signup');
+  $('pw2Wrap').classList.toggle('hidden', m!=='signup');
+  $('authSubmit').textContent = m==='login' ? 'ログイン' : '新規登録';
+  $('password').autocomplete = m==='login' ? 'current-password' : 'new-password';
+}
+$('tabLogin').onclick = ()=>setMode('login');
+$('tabSignup').onclick = ()=>setMode('signup');
+
+document.querySelectorAll('[data-eye]').forEach(b=>{
+  b.onclick = ()=>{ const i = $(b.dataset.eye); i.type = i.type==='password' ? 'text' : 'password'; };
+});
+
+function toLoginId(input){
+  const v = input.trim();
+  if(!v) return { error:'ユーザー名またはメールアドレスを入力してください' };
+  if(v.includes('@')) return { email:v, isUsername:false };
+  const name = v.toLowerCase();
+  if(!/^[a-z0-9_]{3,20}$/.test(name)) return { error:'ユーザー名は英数字と_で3〜20文字にしてください' };
+  return { email:'vault.'+name+'@'+FAKE_DOMAIN, isUsername:true };
+}
+
+$('authSubmit').onclick = ()=>busy($('authSubmit'), async()=>{
+  const id = toLoginId($('email').value);
+  if(id.error) return toast(id.error, 'err');
+  const pw = $('password').value;
+  if(pw.length < 8) return toast('パスワードは8文字以上にしてください', 'err');
+
+  if(mode==='signup'){
+    if(pw !== $('password2').value) return toast('パスワードが一致しません', 'err');
+    const { data, error } = await supabase.auth.signUp({ email:id.email, password:pw });
+    if(error) return toast('登録エラー: '+error.message, 'err');
+    if(data.session){ toast('登録できました', 'ok'); }
+    else if(id.isUsername){
+      return toast('登録しましたが、まだログインできません。ダッシュボードで「Confirm email」をオフにしてください。', 'err');
+    } else {
+      return toast('確認メールを送りました。リンクを押してからログインしてください。', 'ok');
+    }
+  } else {
+    const { error } = await supabase.auth.signInWithPassword({ email:id.email, password:pw });
+    if(error){
+      if(/not confirmed/i.test(error.message))
+        return toast('メール確認が済んでいません。ユーザー名で使う場合は「Confirm email」をオフにしてください。', 'err');
+      return toast('ログインエラー: '+error.message, 'err');
+    }
+  }
+  $('password').value=''; $('password2').value='';
+  refresh();
+});
+['email','password','password2'].forEach(id=>{
+  $(id).addEventListener('keydown', e=>{ if(e.key==='Enter') $('authSubmit').click(); });
+});
+
+const doLogout = async()=>{ cryptoKey = null; items = []; await supabase.auth.signOut(); refresh(); };
+$('logout1').onclick = doLogout;
+$('logout2').onclick = doLogout;
+$('lock').onclick = lockVault;
+
+/* ---------- あいことば ---------- */
+$('unlock').onclick = ()=>busy($('unlock'), async()=>{
+  const pass = $('vpass').value;
+  if(pass.length < 8) return toast('あいことばは8文字以上にしてください', 'err');
+  $('unlock').textContent = '処理中…';
+
+  if(!hasSetup){
+    if(pass !== $('vpass2').value) return toast('2回の入力が一致しません', 'err');
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const key = await deriveKey(pass, salt);
+    const chk = await encryptObj(key, { ok:true });
+    const { error } = await supabase.from('user_settings').insert([
+      { app:'vault', key:'salt',  value:{ v: b64(salt) } },
+      { app:'vault', key:'check', value:{ iv: chk.iv, ct: chk.ct } }
+    ]);
+    if(error) return toast('初期設定エラー: '+error.message, 'err');
+    cryptoKey = key;
+  } else {
+    const { data, error } = await supabase.from('user_settings')
+      .select('key,value').eq('app','vault').in('key',['salt','check']);
+    if(error) return toast('読み込みエラー: '+error.message, 'err');
+    const salt = unb64(data.find(r=>r.key==='salt').value.v);
+    const chk  = data.find(r=>r.key==='check').value;
+    const key = await deriveKey(pass, salt);
+    try{ await decryptObj(key, chk.iv, chk.ct); }
+    catch(e){ return toast('あいことばが違います', 'err'); }
+    cryptoKey = key;
+  }
+  $('vpass').value=''; $('vpass2').value='';
+  resetIdle(); refresh();
+});
+$('vpass').addEventListener('keydown', e=>{ if(e.key==='Enter') $('unlock').click(); });
+
+/* ---------- 保存・一覧 ---------- */
+$('add').onclick = ()=>busy($('add'), async()=>{
+  if(!cryptoKey) return;
+  const title = $('title').value.trim();
+  if(!title) return toast('タイトルを入力してください', 'err');
+  const { iv, ct } = await encryptObj(cryptoKey, { title, body: $('body').value });
+  const { error } = await supabase.from('vault_items').insert({ iv, ciphertext: ct });
+  if(error) return toast('保存エラー: '+error.message, 'err');
+  $('title').value=''; $('body').value='';
+  toast('暗号化して保存しました', 'ok');
+  loadItems();
+});
+
+async function loadItems(){
+  const { data, error } = await supabase.from('vault_items')
+    .select('id,iv,ciphertext,created_at').order('created_at',{ascending:false});
+  if(error) return toast('読み込みエラー: '+error.message, 'err');
+  const out = [];
+  for(const r of data){
+    try{
+      const o = await decryptObj(cryptoKey, r.iv, r.ciphertext);
+      out.push({ id:r.id, title:o.title, body:o.body, at:r.created_at, ok:true });
+    }catch(e){
+      out.push({ id:r.id, title:'(復号できません)', body:'', at:r.created_at, ok:false });
+    }
+  }
+  items = out; renderItems();
+}
+
+function fmtDate(s){
+  const d = new Date(s);
+  return d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+
+function renderItems(){
+  const q = $('search').value.trim().toLowerCase();
+  const list = $('list'); list.innerHTML = '';
+  const shown = items.filter(i => !q || i.title.toLowerCase().includes(q));
+  $('count').textContent = items.length ? shown.length + ' / ' + items.length + ' 件' : '';
+  if(!shown.length){
+    const e = document.createElement('div'); e.className = 'empty';
+    const big = document.createElement('div'); big.className = 'big'; big.textContent = '';
+    const t = document.createElement('div'); t.textContent = items.length ? '見つかりませんでした' : 'まだ何も保存されていません';
+    e.append(big, t); list.append(e); return;
+  }
+  for(const it of shown){
+    const card = document.createElement('div'); card.className = 'item';
+    const head = document.createElement('div'); head.className = 'head';
+    const left = document.createElement('div');
+    const t = document.createElement('div'); t.className = 't'; t.textContent = it.title;
+    const d = document.createElement('div'); d.className = 'd'; d.textContent = fmtDate(it.at);
+    left.append(t, d); head.append(left);
+
+    const body = document.createElement('div'); body.className = 'body hidden'; body.textContent = it.body;
+    const acts = document.createElement('div'); acts.className = 'acts';
+    const view = document.createElement('button'); view.className = 'ghost sm'; view.textContent = '表示';
+    view.onclick = ()=>{ const hide = body.classList.toggle('hidden'); view.textContent = hide ? '表示' : '隠す'; };
+    const copy = document.createElement('button'); copy.className = 'ghost sm'; copy.textContent = 'コピー';
+    copy.onclick = async()=>{
+      try{ await navigator.clipboard.writeText(it.body); toast('コピーしました', 'ok'); }
+      catch(e){ toast('コピーできませんでした。「表示」から手動でコピーしてください', 'err'); }
+    };
+    const del = document.createElement('button'); del.className = 'danger sm'; del.textContent = '削除';
+    del.onclick = async()=>{
+      if(!confirm('「'+it.title+'」を削除します。元に戻せません。よろしいですか?')) return;
+      const { error } = await supabase.from('vault_items').delete().eq('id', it.id);
+      if(error) return toast('削除エラー: '+error.message, 'err');
+      toast('削除しました', 'ok'); loadItems();
+    };
+    if(!it.ok){ view.disabled = true; copy.disabled = true; }
+    acts.append(view, copy, del);
+    card.append(head, body, acts); list.append(card);
+  }
+}
+$('search').addEventListener('input', renderItems);
+
+supabase.auth.onAuthStateChange(ev=>{ if(ev==='SIGNED_OUT'){ cryptoKey = null; items = []; } });
+refresh();
+</script>
+</body>
+</html>
